@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Blockchain Image Upload & Retrieval</title>
+<style>
+  body { font-family: Arial, sans-serif; margin: 20px; background:#f9f9f9; }
+  h1 { text-align: center; }
+  .section { background:#fff; padding:15px; border-radius:8px; box-shadow:0 0 10px rgba(0,0,0,0.1); margin-bottom:20px; }
+  input[type="text"], input[type="password"], input[type="file"] { width: 250px; padding: 8px; margin: 5px; }
+  button { padding: 8px 12px; margin: 5px; cursor: pointer; }
+  button:disabled { opacity: 0.6; cursor: not-allowed; }
+  #imagePreview { max-width: 300px; margin-top: 10px; border: 1px solid #ccc; padding: 5px; background:#fff; }
+  #historyContainer { margin-top: 20px; }
+  #historyBox { padding: 15px; background: #eef; border-radius: 8px; margin-bottom: 20px; }
+  #historyBox h3 { margin-top: 0; }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+  th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+  th { background-color: #ddd; }
+  #retrievedImage { max-width: 300px; display:none; margin-top:10px; }
+  .upload-info { background: #dde; padding: 10px; border-radius: 5px; margin-bottom: 10px; }
+</style>
+</head>
+<body>
+
+<h1>PoC</h1>
+<div class="section">
+<h3>Login/Register and then the functions can be used</h3>
+</div>
+<div class="section">
+<h2>User Authentication</h2>
+<form id="authForm" onsubmit="return false;">
+  <input type="text" id="username" placeholder="Username" required />
+  <input type="password" id="password" placeholder="Password" required />
+  <br/>
+  <button type="button" id="registerBtn">Register</button>
+  <button type="button" id="loginBtn">Login</button>
+  <button type="button" id="logoutBtn">Logout</button>
+</form>
+<p class="status" id="authStatus">Not logged in</p>
+</div>
+
+<div class="section">
+<h2>Upload Image</h2>
+<input type="file" id="imageFile" accept="image/*" />
+<br/>
+<input type="text" id="uniqueCode" placeholder="Unique Code" required />
+<br/>
+<button type="button" id="uploadBtn">Upload Image</button>
+<p class="status" id="uploadStatus"></p>
+</div>
+
+<div class="section">
+<h2>Retrieve Image</h2>
+<input type="text" id="retrieveCode" placeholder="Enter Unique Code" required />
+<br/>
+<button type="button" id="retrieveBtn">Retrieve Image</button>
+<br/>
+<img id="retrievedImage" src="" alt="Retrieved Image"/>
+<p id="retrieveTimestamp"></p>
+</div>
+
+<div class="section" id="historyContainer">
+<h2>Your Upload History</h2>
+<button type="button" id="historyBtn">Show History</button>
+<div id="historyBox">
+  <!-- History content will be injected here -->
+</div>
+</div>
+
+<script>
+let currentUser = null;
+
+// Cache DOM elements
+const authStatus = document.getElementById('authStatus');
+const registerBtn = document.getElementById('registerBtn');
+const loginBtn = document.getElementById('loginBtn');
+const logoutBtn = document.getElementById('logoutBtn');
+const uploadBtn = document.getElementById('uploadBtn');
+const retrieveBtn = document.getElementById('retrieveBtn');
+const historyBtn = document.getElementById('historyBtn');
+
+// Utility: Update UI based on login status
+function updateUI() {
+  const loggedIn = !!currentUser;
+  authStatus.innerText = loggedIn ? "Logged in as " + currentUser : "Not logged in";
+
+  registerBtn.disabled = loggedIn;
+  loginBtn.disabled = loggedIn;
+  logoutBtn.disabled = !loggedIn;
+  uploadBtn.disabled = !loggedIn;
+  retrieveBtn.disabled = !loggedIn;
+  historyBtn.disabled = !loggedIn;
+
+  // Disable input fields for upload when not logged in
+  document.getElementById('imageFile').disabled = !loggedIn;
+  document.getElementById('uniqueCode').disabled = !loggedIn;
+  // Disable input for retrieve code
+  document.getElementById('retrieveCode').disabled = !loggedIn;
+}
+
+// Register user
+async function register() {
+  const username = document.getElementById('username').value.trim();
+  const password = document.getElementById('password').value.trim();
+
+  if (!username || !password) {
+    alert('Please enter username and password');
+    return;
+  }
+
+  try {
+    const res = await fetch('/register', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ username, password })
+    });
+    const text = await res.text();
+    alert(text);
+  } catch (error) {
+    console.error('Register error:', error);
+    alert('Registration failed. Please try again.');
+  }
+}
+
+// Login user
+async function login() {
+  const username = document.getElementById('username').value.trim();
+  const password = document.getElementById('password').value.trim();
+
+  if (!username || !password) {
+    alert('Please enter username and password');
+    return;
+  }
+
+  try {
+    const res = await fetch('/login', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ username, password })
+    });
+    const text = await res.text();
+    if (res.ok) {
+      currentUser = username;
+      alert(`Logged in as ${currentUser}`);
+    } else {
+      alert(text);
+    }
+  } catch (error) {
+    console.error('Login error:', error);
+    alert('Login failed. Please try again.');
+  }
+  updateUI();
+}
+
+// Logout user
+async function logout() {
+  if (confirm('Are you sure you want to logout?')) {
+    try {
+      await fetch('/logout', { method: 'POST' });
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      currentUser = null;
+      
+      // Clear all input fields
+      document.getElementById('username').value = '';
+      document.getElementById('password').value = '';
+      document.getElementById('imageFile').value = '';
+      document.getElementById('uniqueCode').value = '';
+      document.getElementById('retrieveCode').value = '';
+
+      // Hide or reset other elements
+      document.getElementById('retrievedImage').style.display = 'none';
+      document.getElementById('retrievedImage').src = '';
+      document.getElementById('retrieveTimestamp').innerText = '';
+      document.getElementById('uploadStatus').innerText = '';
+
+      // Clear the history container
+      const historyContainer = document.getElementById('historyBox');
+      historyContainer.innerHTML = '';
+
+      alert('Logged out');
+      updateUI();
+    }
+  }
+}
+
+// Upload image
+async function uploadImage() {
+  if (!currentUser) { alert('Please login first'); return; }
+
+  const fileInput = document.getElementById('imageFile');
+  const uniqueCode = document.getElementById('uniqueCode').value.trim();
+
+  if (!fileInput.files[0]) {
+    alert('Select an image file');
+    return;
+  }
+  if (!uniqueCode) {
+    alert('Enter a unique code');
+    return;
+  }
+
+  // Read file as Base64
+  const reader = new FileReader();
+  reader.onloadend = async () => {
+    const base64Image = reader.result.split(',')[1];
+    try {
+      const res = await fetch('/upload', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ imageBase64: base64Image, uniqueCode })
+      });
+      const data = await res.json();
+      document.getElementById('uploadStatus').innerText = data.message;
+    } catch (err) {
+      console.error('Upload error:', err);
+      document.getElementById('uploadStatus').innerText = 'Upload failed.';
+    }
+  };
+  reader.readAsDataURL(fileInput.files[0]);
+}
+
+// Retrieve image
+async function retrieveImage() {
+  if (!currentUser) { alert('Please login first'); return; }
+  const code = document.getElementById('retrieveCode').value.trim();
+
+  if (!code) {
+    alert('Enter a unique code');
+    return;
+  }
+
+  try {
+    const res = await fetch('/retrieve', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ uniqueCode: code })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      document.getElementById('retrievedImage').src = 'data:image/png;base64,' + data.imageBase64;
+      document.getElementById('retrievedImage').style.display = 'block';
+      document.getElementById('retrieveTimestamp').innerText = 'Retrieved at: ' + data.timestamp;
+    } else {
+      const errorText = await res.text();
+      alert(errorText);
+    }
+  } catch (err) {
+    console.error('Retrieve error:', err);
+    alert('Failed to retrieve image.');
+  }
+}
+
+// Show upload history
+async function getHistory() {
+  if (!currentUser) { alert('Please login first'); return; }
+  try {
+    const res = await fetch('/history');
+    if (res.ok) {
+      const data = await res.json();
+      const container = document.getElementById('historyBox');
+      container.innerHTML = '';
+
+      if (!data.fullHistory || data.fullHistory.length === 0) {
+        container.innerHTML = '<p>No upload history available.</p>';
+        return;
+      }
+
+      // Get earliest upload info
+      const firstHistoryItem = data.fullHistory[0];
+      const earliestEntry = firstHistoryItem.history.reduce((earliest, current) => {
+        return new Date(current.timestamp) < new Date(earliest.timestamp) ? current : earliest;
+      }, firstHistoryItem.history[0]);
+
+      // Show upload info
+      const uploadInfoDiv = document.createElement('div');
+      uploadInfoDiv.className = 'upload-info';
+      uploadInfoDiv.innerHTML = `
+        <strong>Upload Time:</strong> ${earliestEntry.timestamp}<br/>
+        <strong>Uploaded By:</strong> ${earliestEntry.owner}
+      `;
+      container.appendChild(uploadInfoDiv);
+
+      // Create access log table
+      const table = document.createElement('table');
+      const thead = document.createElement('thead');
+      thead.innerHTML = `
+        <tr>
+          <th>Access Time</th>
+          <th>Accessed By</th>
+        </tr>`;
+      table.appendChild(thead);
+
+      const tbody = document.createElement('tbody');
+
+      data.fullHistory.forEach(item => {
+        item.history.forEach(entry => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${entry.timestamp}</td>
+            <td>${entry.owner}</td>
+          `;
+          tbody.appendChild(row);
+        });
+      });
+
+      table.appendChild(tbody);
+      container.appendChild(table);
+    } else {
+      alert('Failed to fetch history.');
+    }
+  } catch (err) {
+    console.error('History error:', err);
+    alert('Error fetching history.');
+  }
+}
+
+// Attach event listeners after DOM loads
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('registerBtn').addEventListener('click', register);
+  document.getElementById('loginBtn').addEventListener('click', login);
+  document.getElementById('logoutBtn').addEventListener('click', logout);
+  document.getElementById('uploadBtn').addEventListener('click', uploadImage);
+  document.getElementById('retrieveBtn').addEventListener('click', retrieveImage);
+  document.getElementById('historyBtn').addEventListener('click', getHistory);
+
+  // Initialize UI
+  updateUI();
+});
+</script>
+
+</body>
+</html>
