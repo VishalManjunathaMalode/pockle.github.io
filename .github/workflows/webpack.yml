@@ -21,8 +21,13 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Serve static site locally (optional)
+        run: |
+          npx serve -s . &
+          sleep 5
+
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
-          # Using default GITHUB_TOKEN provided by GitHub Actions
-          publish_dir: .  # Adjust if your build output is in a different directory
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: .  # or specify a folder if you build into 'dist' or similar
