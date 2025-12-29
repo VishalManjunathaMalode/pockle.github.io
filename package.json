@@ -1,0 +1,14 @@
+{
+  "name": "blockchain-image-server",
+  "version": "1.0.0",
+  "description": "A blockchain-based image storage with user authentication",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "author": "",
+  "license": "ISC"
+}
